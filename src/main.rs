@@ -1,11 +1,15 @@
-use axum::{Router, response::Html, routing::get};
+use axum::{Router, response::Html, routing::get, routing::post};
 use listenfd::ListenFd;
 use tokio::net::TcpListener;
+
+use rust_http_demo::handlers::shortlink::create_shortlink;
 
 #[tokio::main]
 async fn main() {
     // build app routes
-    let app: Router = Router::new().route("/", get(handler));
+    let app: Router = Router::new()
+        .route("/", get(handler))
+        .route("/shortlink", post(create_shortlink));
 
     let mut listenfd: ListenFd = ListenFd::from_env();
     let listener = match listenfd.take_tcp_listener(0).unwrap() {
