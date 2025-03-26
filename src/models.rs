@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Debug)]
 #[diesel(table_name = crate::schema::shortlink)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct ShortLink {
