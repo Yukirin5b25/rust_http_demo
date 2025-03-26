@@ -46,8 +46,8 @@ pub async fn create_shortlink(
     State(pool): State<Pool<AsyncPgConnection>>,
     Json(payload): Json<ShortlinkParams>,
 ) -> Result<Json<ShortlinkResponse>, (StatusCode, String)> {
-    // let now = chrono::Utc::now();
-    let mut short_hash = generate_shortlink(&payload.url, None) + "A";
+    let now = chrono::Utc::now();
+    let mut short_hash = generate_shortlink(&payload.url, Some(&now.to_string())) + "A";
 
     let mut conn = pool.get().await.map_err(internal_error)?;
 
@@ -63,16 +63,9 @@ pub async fn create_shortlink(
         println!("{:?}", shortlink);
 
         match shortlink {
-            Some(shortlink) => {
-                if shortlink.url == payload.url {
-                    return Ok(Json(ShortlinkResponse {
-                        shortlink: format!("http://localhost:8080/{}", shortlink.hash),
-                        expire_at: shortlink.expire_at.to_string(),
-                    }));
-                } else {
-                    let last = short_hash.pop();
-                    short_hash.push((last.unwrap() as u8 + 1) as char);
-                }
+            Some(_) => {
+                let last = short_hash.pop();
+                short_hash.push((last.unwrap() as u8 + 1) as char);
             }
             None => break,
         }
@@ -88,7 +81,7 @@ pub async fn create_shortlink(
         .values(models::NewShortlink {
             hash: &short_hash,
             url: &payload.url,
-            expire_at: &(chrono::Utc::now() + chrono::TimeDelta::days(10)).naive_utc(),
+            expire_at: &(now + chrono::TimeDelta::days(10)).naive_utc(),
         })
         .returning(models::ShortLink::as_returning())
         .get_result::<models::ShortLink>(&mut conn)
