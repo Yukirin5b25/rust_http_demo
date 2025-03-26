@@ -8,7 +8,7 @@ use rust_http_demo::handlers::shortlink;
 async fn main() {
     // build app routes
     let app: Router = Router::new()
-        .route("/{short_link}", get(shortlink::redirect_shortlink))
+        .route("/{short_hash}", get(shortlink::redirect_shortlink))
         .route("/shortlink", post(shortlink::create_shortlink));
 
     let mut listenfd: ListenFd = ListenFd::from_env();
