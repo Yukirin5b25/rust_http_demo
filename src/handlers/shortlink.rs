@@ -1,8 +1,11 @@
+use std::collections::HashMap;
 use std::option::Option;
+use std::sync::Mutex;
 
 use axum::response::{IntoResponse, Redirect};
-use axum::{Json, extract::Path};
+use axum::{Json, extract::Path, http::StatusCode};
 use base62;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -16,8 +19,12 @@ pub fn generate_shortlink(url: &str, identifier: Option<&str>) -> String {
     return base62::encode(number)[..8].to_string();
 }
 
+lazy_static! {
+    static ref MEM_URL_STORE: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+}
+
 #[derive(Debug, Serialize, Clone)]
-struct Shortlink {
+pub struct Shortlink {
     short_hash: String,
     short_link: String,
 }
@@ -27,19 +34,26 @@ pub struct ShortlinkParams {
     url: String,
 }
 
-pub async fn create_shortlink(Json(payload): Json<ShortlinkParams>) -> impl IntoResponse {
+pub async fn create_shortlink(
+    Json(payload): Json<ShortlinkParams>,
+    // ) -> Result<Json<Shortlink>, AppError> {
+) -> impl IntoResponse {
     let short_hash = generate_shortlink(&payload.url, None);
-    let short_link = format!("http://localhost:8080/{}", short_hash);
+
+    let mut store = MEM_URL_STORE.lock().unwrap();
+    store.entry(short_hash.clone()).or_insert(payload.url);
+
+    let short_link = format!("http://localhost:8080/{}", &short_hash);
     Json(Shortlink {
-        short_hash: short_hash,
-        short_link: short_link,
+        short_hash,
+        short_link,
     })
 }
 
-pub async fn redirect_to_google(Path(short_hash): Path<String>) -> impl IntoResponse {
-    println!(
-        "TODO: Should redirect to http://localhost:8080/{} instead",
-        short_hash
-    );
-    Redirect::to("https://www.google.com")
+pub async fn redirect_shortlink(Path(short_hash): Path<String>) -> impl IntoResponse {
+    let store = MEM_URL_STORE.lock().unwrap();
+    match store.get(&short_hash) {
+        Some(url) => Redirect::to(url).into_response(),
+        None => (StatusCode::NOT_FOUND, "Shortlink not found").into_response(),
+    }
 }

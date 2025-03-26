@@ -1,4 +1,4 @@
-use axum::{Router, response::Html, routing::get, routing::post};
+use axum::{Router, routing::get, routing::post};
 use listenfd::ListenFd;
 use tokio::net::TcpListener;
 
@@ -8,7 +8,7 @@ use rust_http_demo::handlers::shortlink;
 async fn main() {
     // build app routes
     let app: Router = Router::new()
-        .route("/{short_link}", get(shortlink::redirect_to_google))
+        .route("/{short_link}", get(shortlink::redirect_shortlink))
         .route("/shortlink", post(shortlink::create_shortlink));
 
     let mut listenfd: ListenFd = ListenFd::from_env();
@@ -25,8 +25,4 @@ async fn main() {
     // run app
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn handler() -> Html<&'static str> {
-    Html("<h1>Hello, World!</h1>")
 }
