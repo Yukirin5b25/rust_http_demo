@@ -12,6 +12,8 @@
                 "--",
                 "cargo",
                 "watch",
+                "--ignore",
+                "logs",
                 "-x",
                 "run"
             ],

@@ -51,16 +51,3 @@ impl Config {
         }
     }
 }
-
-// impl axum::extract::FromRef<Config> for Config {
-//     fn from_ref(&self) -> Self {
-//         Config {
-//             axum_server_port: self.axum_server_port,
-//             database_url: self.database_url.clone(),
-//             shortlink_base_url: self.shortlink_base_url.clone(),
-//             shortlink_length: self.shortlink_length,
-//             shortlink_expire_days: self.shortlink_expire_days,
-//             shortlink_max_hash_retries: self.shortlink_max_hash_retries,
-//         }
-//     }
-// }
