@@ -1,8 +1,8 @@
 use axum::{Json, extract::State, response::IntoResponse};
 
-use crate::state::AppState;
+use crate::state::MatricState;
 
-pub async fn get_config(State(state): State<AppState>) -> impl IntoResponse {
+pub async fn get_config(State(state): State<MatricState>) -> impl IntoResponse {
     let mut config = state.config.clone();
 
     // hide database password using url::Url

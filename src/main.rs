@@ -1,3 +1,6 @@
+use std::future::ready;
+
+use axum::middleware;
 use axum::{Router, routing::get, routing::post};
 use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::pooled_connection::bb8::Pool;
@@ -11,8 +14,55 @@ use listenfd::ListenFd;
 use tokio::net::TcpListener;
 
 use rust_http_demo::config::Config;
-use rust_http_demo::handlers::{config, shortlink};
-use rust_http_demo::state::AppState;
+use rust_http_demo::handlers::{config, metrics::track_metrics, setup_metrics_recorder, shortlink};
+use rust_http_demo::state::{AppState, MatricState};
+
+async fn start_main_server() {
+    let config = Config::from_env();
+
+    let pool_config = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
+        config.database_url.clone(),
+    );
+    let pool = Pool::builder().build(pool_config).await.unwrap();
+    let mut listenfd: ListenFd = ListenFd::from_env();
+    let listener = match listenfd.take_tcp_listener(0).unwrap() {
+        // if we are given a tcp listener on listen fd 0, we use that one
+        Some(listener) => {
+            listener.set_nonblocking(true).unwrap();
+            TcpListener::from_std(listener).unwrap()
+        }
+        // otherwise fall back to local listening
+        None => TcpListener::bind(format!("127.0.0.1:{}", config.axum_server_port))
+            .await
+            .unwrap(),
+    };
+    let state = AppState { config, pool };
+    let app: Router = Router::new()
+        .route("/{short_hash}", get(shortlink::redirect_shortlink))
+        .route("/shortlink", post(shortlink::create_shortlink))
+        .with_state(state)
+        .route_layer(middleware::from_fn(track_metrics));
+
+    info!("App listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app).await.unwrap()
+}
+
+async fn start_metrics_server() {
+    let config = Config::from_env();
+
+    let metric_state = MatricState { config };
+    let recorder_handle = setup_metrics_recorder();
+
+    let listener = TcpListener::bind("127.0.0.1:7878").await.unwrap();
+
+    let app: Router = Router::new()
+        .route("/metrics", get(move || ready(recorder_handle.render())))
+        .route("/config", get(config::get_config))
+        .with_state(metric_state);
+
+    info!("Metrics listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app).await.unwrap()
+}
 
 #[tokio::main]
 async fn main() {
@@ -34,34 +84,7 @@ async fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set global subscriber");
 
-    // init resources
-    let pool_config = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
-        config.database_url.clone(),
-    );
-    let pool = Pool::builder().build(pool_config).await.unwrap();
-    let mut listenfd: ListenFd = ListenFd::from_env();
-    let listener = match listenfd.take_tcp_listener(0).unwrap() {
-        // if we are given a tcp listener on listen fd 0, we use that one
-        Some(listener) => {
-            listener.set_nonblocking(true).unwrap();
-            TcpListener::from_std(listener).unwrap()
-        }
-        // otherwise fall back to local listening
-        None => TcpListener::bind(format!("127.0.0.1:{}", config.axum_server_port))
-            .await
-            .unwrap(),
-    };
-
-    // build app routes
-    let state = AppState { config, pool };
-    let app: Router = Router::new()
-        .route("/{short_hash}", get(shortlink::redirect_shortlink))
-        .route("/shortlink", post(shortlink::create_shortlink))
-        .route("/config", get(config::get_config))
-        .with_state(state);
-
     // run app
     info!("Starting the application...");
-    info!("Listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, app).await.unwrap();
+    let (_main_server, _metrics_server) = tokio::join!(start_main_server(), start_metrics_server());
 }
