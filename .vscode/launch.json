@@ -10,8 +10,7 @@
             "name": "Cargo launch",
             "cargo": {
                 "args": [
-                    "build",
-                    "--lib"
+                    "build"
                 ]
             },
             "args": []
