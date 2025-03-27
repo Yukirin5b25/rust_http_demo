@@ -12,6 +12,7 @@ use diesel_async::RunQueryDsl;
 // use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tracing::info;
 
 use crate::schema;
 use crate::{models, state::AppState};
@@ -100,6 +101,12 @@ pub async fn create_shortlink(
     //         .or_insert(payload.url.clone());
     // } // Drop the MutexGuard here before await
 
+    info!(
+        "Shortlink created for {} with hash {}",
+        payload.url.as_str(),
+        short_hash,
+    );
+
     Ok(Json(ShortlinkResponse {
         shortlink: format!("{}/{}", state.config.shortlink_base_url, shortlink.hash),
         expire_at: shortlink.expire_at.to_string(),
@@ -125,6 +132,8 @@ pub async fn redirect_shortlink(
         .await
         .optional()
         .map_err(internal_error)?;
+
+    info!("Shortlink redirected with hash {}", short_hash);
 
     match shortlink {
         Some(shortlink) => Ok(Redirect::to(&shortlink.url)),

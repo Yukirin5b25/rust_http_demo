@@ -21,13 +21,16 @@ async fn main() {
     let config = Config::from_env();
 
     // init logger
-    let file_appender = rolling::daily("logs", "app.log"); // Logs will be written to logs/app.log
+    let file_appender = rolling::daily(
+        config.logging_file_location.clone(),
+        config.logging_file_name.clone(),
+    );
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     let subscriber = Registry::default()
-        .with(EnvFilter::new("info")) // Set log level to Info
-        .with(fmt::Layer::new().with_writer(std::io::stdout)) // Log to stdout
-        .with(fmt::Layer::new().with_writer(non_blocking)); // Log to file
+        .with(EnvFilter::new(config.logging_level.clone()))
+        .with(fmt::Layer::new().with_writer(std::io::stdout))
+        .with(fmt::Layer::new().with_writer(non_blocking));
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set global subscriber");
 
