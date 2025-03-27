@@ -7,3 +7,8 @@ pub struct AppState {
     pub config: Config,
     pub pool: Pool<AsyncPgConnection>,
 }
+
+#[derive(Clone)]
+pub struct MatricState {
+    pub config: Config,
+}
