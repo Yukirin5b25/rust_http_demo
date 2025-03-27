@@ -6,5 +6,4 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
    && apt-get -y install clang lld \
    && apt-get autoremove -y && apt-get clean -y
 
-EXPOSE 7878
-EXPOSE 8080
+EXPOSE 7878 8080
