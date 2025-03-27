@@ -3,6 +3,10 @@ use diesel_async::pooled_connection::AsyncDieselConnectionManager;
 use diesel_async::pooled_connection::bb8::Pool;
 use dotenv::dotenv;
 
+use tracing::info;
+use tracing_appender::rolling;
+use tracing_subscriber::{EnvFilter, Registry, fmt, layer::SubscriberExt};
+
 use listenfd::ListenFd;
 use tokio::net::TcpListener;
 
@@ -15,6 +19,20 @@ async fn main() {
     // init configs
     dotenv().ok();
     let config = Config::from_env();
+
+    // init logger
+    let file_appender = rolling::daily(
+        config.logging_file_location.clone(),
+        config.logging_file_name.clone(),
+    );
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    let subscriber = Registry::default()
+        .with(EnvFilter::new(config.logging_level.clone()))
+        .with(fmt::Layer::new().with_writer(std::io::stdout))
+        .with(fmt::Layer::new().with_writer(non_blocking));
+
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set global subscriber");
 
     // init resources
     let pool_config = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
@@ -43,6 +61,7 @@ async fn main() {
         .with_state(state);
 
     // run app
-    println!("listening on {}", listener.local_addr().unwrap());
+    info!("Starting the application...");
+    info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
